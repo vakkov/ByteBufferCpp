@@ -36,6 +36,7 @@
 
 #include <vector>
 #include <memory>
+#include <bit>
 
 #ifdef BB_UTILITY
 #include <iostream>
@@ -45,6 +46,19 @@
 #ifdef BB_USE_NS
 namespace bb {
 #endif
+
+enum class ByteOrder
+{
+#if defined(_MSC_VER) && !defined(__clang__)
+    little = 0,
+    big    = 1,
+    native = little
+#else
+    little = __ORDER_LITTLE_ENDIAN__,
+    big    = __ORDER_BIG_ENDIAN__,
+    native = __BYTE_ORDER__
+#endif
+};
 
 class ByteBuffer {
 public:
@@ -59,6 +73,9 @@ public:
 	bool equals(ByteBuffer* other); // Compare if the contents are equivalent
 	void resize(uint32_t newSize);
 	uint32_t size(); // Size of internal vector
+	//ByteOrder endian = ByteOrder::big; // Default to big endian
+
+
 
 	// Basic Searching (Linear)
 	template<typename T> int32_t find(T key, uint32_t start = 0) {
@@ -121,6 +138,9 @@ public:
 	void putShort(uint16_t value);
 	void putShort(uint16_t value, uint32_t index);
 
+	ByteOrder order(); // Get the byte order
+	ByteBuffer& order(ByteOrder endian); // Set the byte order
+
 	// Buffer Position Accessors & Mutators
 
 	void setReadPos(uint32_t r) {
@@ -154,6 +174,7 @@ private:
 	uint32_t wpos;
 	mutable uint32_t rpos;
 	std::vector<uint8_t> buf;
+	ByteOrder endian = ByteOrder::big;
 
 #ifdef BB_UTILITY
 	std::string name;
@@ -166,14 +187,17 @@ private:
 	}
 
 	template<typename T> T read(uint32_t index) const {
-		if (index + sizeof(T) <= buf.size())
-			return *((T*) &buf[index]);
+		if (index + sizeof(T) <= buf.size()) {
+			//return *((T*) &buf[index]);
+			T data = *((T*) &buf[index]);
+			return convertEndian(data);
+		}
 		return 0;
 	}
 
 	template<typename T> void append(T data) {
+		data = convertEndian(data);
 		uint32_t s = sizeof(data);
-
 		if (size() < (wpos + s))
 			buf.resize(wpos + s);
 		memcpy(&buf[wpos], (uint8_t*) &data, s);
@@ -183,6 +207,7 @@ private:
 	}
 
 	template<typename T> void insert(T data, uint32_t index) {
+		data = convertEndian(data);
 		if ((index + sizeof(data)) > size()) {
 			buf.resize(size() + (index + sizeof(data)));
 		}
@@ -190,6 +215,46 @@ private:
 		memcpy(&buf[index], (uint8_t*) &data, sizeof(data));
 		wpos = index + sizeof(data);
 	}
+
+	template<typename T>
+    T convertEndian(T data) const {
+        if (endian == ByteOrder::native) {
+            return data;
+        } else if (endian == ByteOrder::little) {
+            return toLittleEndian(data);
+        } else {
+            return toBigEndian(data);
+        }
+    }
+
+	template<typename T>
+    T toLittleEndian(T data) const {
+        if constexpr (std::endian::native == std::endian::little) {
+            return data;
+        } else {
+            return swapEndian(data);
+        }
+    }
+
+    template<typename T>
+    T toBigEndian(T data) const {
+        if constexpr (std::endian::native == std::endian::big) {
+            return data;
+        } else {
+            return swapEndian(data);
+        }
+    }
+
+	template<typename T>
+    T swapEndian(T data) const {
+        T swapped;
+        uint8_t* src = reinterpret_cast<uint8_t*>(&data);
+        uint8_t* dst = reinterpret_cast<uint8_t*>(&swapped);
+        for (size_t i = 0; i < sizeof(T); i++) {
+            dst[i] = src[sizeof(T) - 1 - i];
+        }
+        return swapped;
+    }
 };
 
 #ifdef BB_USE_NS

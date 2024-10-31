@@ -45,16 +45,20 @@ ByteBuffer::ByteBuffer(uint32_t size) {
  * @param arr uint8_t array of data (should be of length len)
  * @param size Size of space to allocate
  */
+// ByteBuffer::ByteBuffer(uint8_t* arr, uint32_t size) {
+// 	// If the provided array is NULL, allocate a blank buffer of the provided size
+// 	if (arr == NULL) {
+// 		buf.reserve(size);
+// 		clear();
+// 	} else { // Consume the provided array
+// 		buf.reserve(size);
+// 		clear();
+// 		putBytes(arr, size);
+// 	}
+
 ByteBuffer::ByteBuffer(uint8_t* arr, uint32_t size) {
-	// If the provided array is NULL, allocate a blank buffer of the provided size
-	if (arr == NULL) {
-		buf.reserve(size);
-		clear();
-	} else { // Consume the provided array
-		buf.reserve(size);
-		clear();
-		putBytes(arr, size);
-	}
+    buf.insert(buf.end(), arr, arr + size);
+    clear();
 
 #ifdef BB_UTILITY
 	name = "";
@@ -68,7 +72,8 @@ ByteBuffer::ByteBuffer(uint8_t* arr, uint32_t size) {
  * @return Number of bytes from rpos to the end (size())
  */
 uint32_t ByteBuffer::bytesRemaining() {
-	return size() - rpos;
+	//return size() - rpos;
+	return buf.size() - rpos;
 }
 
 /**
@@ -317,6 +322,15 @@ void ByteBuffer::putShort(uint16_t value) {
 
 void ByteBuffer::putShort(uint16_t value, uint32_t index) {
 	insert<uint16_t>(value, index);
+}
+
+ByteOrder ByteBuffer::order() {
+	return endian;
+}
+
+ByteBuffer& ByteBuffer::order (ByteOrder endian) {
+	this->endian = endian;
+	return *this;
 }
 
 // Utility Functions
